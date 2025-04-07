@@ -1,2 +1,2 @@
 # boto3-changelog
-Visualizing changes 
+Visualizing changes in boto3
