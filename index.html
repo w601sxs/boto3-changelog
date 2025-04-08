@@ -866,10 +866,18 @@
                             // Exact match
                             if (serviceLower === selectedLower) return true;
                             
-                            // Service group match (e.g., "bedrock" matches "bedrock-runtime")
-                            if (serviceLower.includes(selectedLower) || 
-                                selectedLower.includes(serviceLower)) {
-                                return true;
+                            // Service group match with more precise logic:
+                            // 1. If selected service contains a hyphen (like "bedrock-runtime"), 
+                            //    only match exact service names
+                            // 2. If selected service is a base name (like "bedrock"),
+                            //    match services that start with this name followed by nothing or a hyphen
+                            if (!selectedLower.includes('-')) {
+                                // For base service names (no hyphen), match as prefix
+                                // This matches "bedrock" with "bedrock-runtime" but not with "mybedrockservice"
+                                if (serviceLower === selectedLower || 
+                                    serviceLower.startsWith(selectedLower + '-')) {
+                                    return true;
+                                }
                             }
                             
                             return false;
