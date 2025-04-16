@@ -1242,83 +1242,301 @@
                     // Create a link to the AWS What's New page for this service
                     const whatsNewUrl = `https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&awsf.whats-new-categories=*all&whats-new-content-all.q=${encodeURIComponent(primaryService)}&whats-new-content-all.q_operator=AND`;
                     
-                    // Display a message with a link to the AWS What's New page
-                    newsContent.innerHTML = `
-                        <div class="news-item">
-                            <div class="news-title">
-                                <a href="${whatsNewUrl}" target="_blank">View latest ${primaryService} news on AWS</a>
-                            </div>
-                            <div class="news-description">
-                                Click above to see the latest announcements, updates, and news about ${primaryService} on the official AWS What's New page.
-                            </div>
-                        </div>
-                    `;
+                    // Fetch news items from AWS API
+                    const newsItems = await fetchNewsItems(selectedServices);
                     
-                    // Add links for other selected services if there are any
-                    if (selectedServices.length > 1) {
-                        const otherServicesDiv = document.createElement('div');
-                        otherServicesDiv.className = 'news-other-services';
-                        otherServicesDiv.style.marginTop = '20px';
-                        otherServicesDiv.style.borderTop = '1px solid var(--color-border-divider-default)';
-                        otherServicesDiv.style.paddingTop = '15px';
-                        
-                        const otherServicesTitle = document.createElement('div');
-                        otherServicesTitle.style.fontWeight = '600';
-                        otherServicesTitle.style.marginBottom = '10px';
-                        otherServicesTitle.textContent = 'Other selected services:';
-                        
-                        otherServicesDiv.appendChild(otherServicesTitle);
-                        
-                        const servicesList = document.createElement('div');
-                        servicesList.style.display = 'flex';
-                        servicesList.style.flexDirection = 'column';
-                        servicesList.style.gap = '8px';
-                        
-                        // Add links for each additional service
-                        selectedServices.slice(1).forEach(service => {
-                            const serviceUrl = `https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&awsf.whats-new-categories=*all&whats-new-content-all.q=${encodeURIComponent(service)}&whats-new-content-all.q_operator=AND`;
-                            
-                            const serviceLink = document.createElement('a');
-                            serviceLink.href = serviceUrl;
-                            serviceLink.target = '_blank';
-                            serviceLink.style.color = 'var(--color-text-interactive-default)';
-                            serviceLink.style.textDecoration = 'none';
-                            serviceLink.innerHTML = `View ${service} news <span style="font-size: 0.8em;">↗</span>`;
-                            
-                            servicesList.appendChild(serviceLink);
-                        });
-                        
-                        otherServicesDiv.appendChild(servicesList);
-                        newsContent.appendChild(otherServicesDiv);
+                    // Display the news items
+                    newsContent.innerHTML = '';
+                    
+                    if (newsItems.length === 0) {
+                        newsContent.innerHTML = `
+                            <div class="news-error">
+                                <p>No news items found for ${primaryService}.</p>
+                            </div>
+                        `;
+                        return;
                     }
                     
-                    // Add a link to the general AWS What's New page
-                    const generalNewsDiv = document.createElement('div');
-                    generalNewsDiv.className = 'news-general';
-                    generalNewsDiv.style.marginTop = '20px';
-                    generalNewsDiv.style.borderTop = '1px solid var(--color-border-divider-default)';
-                    generalNewsDiv.style.paddingTop = '15px';
+                    // Display up to 5 news items
+                    const itemsToShow = newsItems.slice(0, 5);
                     
-                    const generalNewsLink = document.createElement('a');
-                    generalNewsLink.href = 'https://aws.amazon.com/new/';
-                    generalNewsLink.target = '_blank';
-                    generalNewsLink.style.color = 'var(--color-text-interactive-default)';
-                    generalNewsLink.style.textDecoration = 'none';
-                    generalNewsLink.innerHTML = `View all AWS announcements <span style="font-size: 0.8em;">↗</span>`;
+                    itemsToShow.forEach(item => {
+                        const newsItem = document.createElement('div');
+                        newsItem.className = 'news-item';
+                        
+                        const newsTitle = document.createElement('div');
+                        newsTitle.className = 'news-title';
+                        newsTitle.innerHTML = `<a href="${item.link}" target="_blank">${item.title}</a>`;
+                        
+                        const newsMeta = document.createElement('div');
+                        newsMeta.className = 'news-meta';
+                        newsMeta.innerHTML = `<span>${item.date}</span>`;
+                        
+                        const newsDescription = document.createElement('div');
+                        newsDescription.className = 'news-description';
+                        newsDescription.textContent = item.description;
+                        
+                        newsItem.appendChild(newsTitle);
+                        newsItem.appendChild(newsMeta);
+                        newsItem.appendChild(newsDescription);
+                        
+                        newsContent.appendChild(newsItem);
+                    });
                     
-                    generalNewsDiv.appendChild(generalNewsLink);
-                    newsContent.appendChild(generalNewsDiv);
+                    // Add a "View more" link at the bottom
+                    const viewMoreDiv = document.createElement('div');
+                    viewMoreDiv.className = 'view-more';
+                    viewMoreDiv.style.marginTop = '15px';
+                    viewMoreDiv.style.textAlign = 'right';
+                    
+                    const viewMoreLink = document.createElement('a');
+                    viewMoreLink.href = whatsNewUrl;
+                    viewMoreLink.target = '_blank';
+                    viewMoreLink.style.color = 'var(--color-text-interactive-default)';
+                    viewMoreLink.style.textDecoration = 'none';
+                    viewMoreLink.innerHTML = `View more ${primaryService} news <span style="font-size: 0.8em;">↗</span>`;
+                    
+                    viewMoreDiv.appendChild(viewMoreLink);
+                    newsContent.appendChild(viewMoreDiv);
                     
                 } catch (error) {
-                    console.error('Error setting up news links:', error);
+                    console.error('Error fetching news items:', error);
                     newsContent.innerHTML = `
                         <div class="news-error">
-                            <p>Error loading news links.</p>
+                            <p>Error loading news items.</p>
                             <p>Please try refreshing the page.</p>
                         </div>
                     `;
                 }
             }
+            
+            // Function to fetch news items - handles both API and static data
+            async function fetchNewsItems(services) {
+                // Check if we're running locally (file://) or on a server (http://)
+                const isLocalFile = window.location.protocol === 'file:';
+                
+                if (!isLocalFile) {
+                    try {
+                        // Fetch a large set of news items to ensure we get enough for any service
+                        const apiUrl = `https://aws.amazon.com/api/dirs/items/search?item.directoryId=whats-new-v2&sort_by=item.additionalFields.postDateTime&sort_order=desc&size=100&item.locale=en_US`;
+                        
+                        const response = await fetch(apiUrl, {
+                            mode: 'cors',
+                            headers: {
+                                'Accept': 'application/json'
+                            }
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (data.items && data.items.length > 0) {
+                            // Process all news items
+                            const allItems = data.items.map(item => ({
+                                title: item.item.additionalFields.headline,
+                                link: `https://aws.amazon.com${item.item.additionalFields.headlineUrl}`,
+                                date: new Date(item.item.additionalFields.postDateTime).toLocaleDateString(),
+                                description: extractDescription(item.item.additionalFields.postBody)
+                            }));
+                            
+                            // Filter items based on selected services
+                            const filteredItems = allItems.filter(item => {
+                                return selectedServices.some(service => {
+                                    // Check if the service name appears in the title
+                                    const serviceRegex = new RegExp(service, 'i');
+                                    return serviceRegex.test(item.title);
+                                });
+                            });
+                            
+                            console.log("Selected services:", selectedServices);
+                            console.log("Filtered items count:", filteredItems.length);
+                            
+                            // Return filtered items or general news if no matches
+                            return filteredItems.length > 0 ? filteredItems.slice(0, 5) : allItems.slice(0, 5);
+                        }
+                    } catch (error) {
+                        console.warn('API fetch failed:', error);
+                        return []; // Return empty array if API fails
+                    }
+                } else {
+                    // For local testing, show a message about CORS limitations
+                    return [{
+                        title: "News feed unavailable in local testing due to CORS restrictions",
+                        link: "#",
+                        date: new Date().toLocaleDateString(),
+                        description: "When testing locally, news cannot be fetched due to browser security restrictions. Deploy to a server to see live news."
+                    }];
+                }
+                
+                return []; // Fallback empty array
+            }
+            
+            // Helper function to extract a short description from HTML content
+            function extractDescription(htmlContent) {
+                if (!htmlContent) return '';
+                
+                // Remove HTML tags and get first 150 characters
+                const plainText = htmlContent.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                return plainText.length > 150 ? plainText.substring(0, 150) + '...' : plainText;
+            }
+            
+            /* Old static news items - kept for reference
+            {
+                title: "Amazon Bedrock is now generally available",
+                        link: "https://aws.amazon.com/about-aws/whats-new/2023/09/amazon-bedrock-generally-available/",
+                        date: "Sep 28, 2023",
+                        description: "Amazon Bedrock is now generally available, offering a fully managed service to build and scale generative AI applications with foundation models.",
+                        services: ["bedrock", "ai", "ml"]
+                    },
+                    
+                    // SageMaker news
+                    {
+                        title: "Amazon SageMaker now supports PyTorch 2.0",
+                        link: "https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&awsf.whats-new-categories=*all&whats-new-content-all.q=sagemaker&whats-new-content-all.q_operator=AND",
+                        date: "Jun 14, 2023",
+                        description: "Amazon SageMaker now supports PyTorch 2.0, enabling you to train models with improved performance and developer experience.",
+                        services: ["sagemaker", "ai", "ml"]
+                    },
+                    {
+                        title: "Amazon SageMaker JumpStart adds support for Stable Diffusion XL",
+                        link: "https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&awsf.whats-new-categories=*all&whats-new-content-all.q=sagemaker&whats-new-content-all.q_operator=AND",
+                        date: "Aug 17, 2023",
+                        description: "Amazon SageMaker JumpStart now supports Stable Diffusion XL, allowing you to generate high-quality images with improved detail and composition.",
+                        services: ["sagemaker", "ai", "ml"]
+                    },
+                    {
+                        title: "Amazon SageMaker Feature Store now supports online store TTL",
+                        link: "https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&awsf.whats-new-categories=*all&whats-new-content-all.q=sagemaker&whats-new-content-all.q_operator=AND",
+                        date: "Jul 25, 2023",
+                        description: "Amazon SageMaker Feature Store now supports time-to-live (TTL) for the online store, helping you manage feature data lifecycle and reduce costs.",
+                        services: ["sagemaker", "ai", "ml"]
+                    },
+                    {
+                        title: "Amazon SageMaker Canvas adds support for generative AI capabilities",
+                        link: "https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&awsf.whats-new-categories=*all&whats-new-content-all.q=sagemaker&whats-new-content-all.q_operator=AND",
+                        date: "Jun 27, 2023",
+                        description: "Amazon SageMaker Canvas now supports generative AI capabilities, enabling business analysts to create text and image content without coding.",
+                        services: ["sagemaker", "ai", "ml", "canvas"]
+                    },
+                    {
+                        title: "Amazon SageMaker now supports distributed training with PyTorch FSDP",
+                        link: "https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&awsf.whats-new-categories=*all&whats-new-content-all.q=sagemaker&whats-new-content-all.q_operator=AND",
+                        date: "May 31, 2023",
+                        description: "Amazon SageMaker now supports distributed training with PyTorch Fully Sharded Data Parallel (FSDP), enabling more efficient training of large models.",
+                        services: ["sagemaker", "ai", "ml"]
+                    },
+                    
+                    // Lambda news
+                    {
+                        title: "AWS Lambda now supports Node.js 20",
+                        link: "https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&awsf.whats-new-categories=*all&whats-new-content-all.q=lambda&whats-new-content-all.q_operator=AND",
+                        date: "Mar 5, 2024",
+                        description: "AWS Lambda now supports Node.js 20 as both a managed runtime and a container base image, allowing you to use the latest LTS version of Node.js.",
+                        services: ["lambda", "serverless"]
+                    },
+                    {
+                        title: "AWS Lambda now supports Python 3.12",
+                        link: "https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&awsf.whats-new-categories=*all&whats-new-content-all.q=lambda&whats-new-content-all.q_operator=AND",
+                        date: "Feb 14, 2024",
+                        description: "AWS Lambda now supports Python 3.12 as both a managed runtime and a container base image, enabling you to use the latest Python features.",
+                        services: ["lambda", "serverless", "python"]
+                    },
+                    {
+                        title: "AWS Lambda now supports up to 10 GB of ephemeral storage",
+                        link: "https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&awsf.whats-new-categories=*all&whats-new-content-all.q=lambda&whats-new-content-all.q_operator=AND",
+                        date: "Nov 27, 2023",
+                        description: "AWS Lambda now supports up to 10 GB of ephemeral storage, providing more space for processing larger files and datasets.",
+                        services: ["lambda", "serverless"]
+                    },
+                    {
+                        title: "AWS Lambda now supports 10 GB memory and 6 vCPU cores",
+                        link: "https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&awsf.whats-new-categories=*all&whats-new-content-all.q=lambda&whats-new-content-all.q_operator=AND",
+                        date: "Sep 7, 2023",
+                        description: "AWS Lambda now supports up to 10 GB of memory and 6 vCPU cores, enabling more compute-intensive workloads with improved performance.",
+                        services: ["lambda", "serverless"]
+                    },
+                    {
+                        title: "AWS Lambda now supports response payload size of up to 6 MB",
+                        link: "https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&awsf.whats-new-categories=*all&whats-new-content-all.q=lambda&whats-new-content-all.q_operator=AND",
+                        date: "Apr 27, 2023",
+                        description: "AWS Lambda now supports response payload sizes of up to 6 MB, allowing you to return larger responses from your functions.",
+                        services: ["lambda", "serverless"]
+                    },
+                    
+                    // S3 news
+                    {
+                        title: "Amazon S3 Express One Zone is now generally available",
+                        link: "https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&awsf.whats-new-categories=*all&whats-new-content-all.q=s3&whats-new-content-all.q_operator=AND",
+                        date: "Nov 28, 2023",
+                        description: "Amazon S3 Express One Zone is now generally available, offering single-digit millisecond data access for your most frequently accessed data.",
+                        services: ["s3", "storage"]
+                    },
+                    {
+                        title: "Amazon S3 announces new S3 Lifecycle rule to optimize storage costs",
+                        link: "https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&awsf.whats-new-categories=*all&whats-new-content-all.q=s3&whats-new-content-all.q_operator=AND",
+                        date: "Nov 26, 2023",
+                        description: "Amazon S3 announces a new S3 Lifecycle rule to optimize storage costs by automatically transitioning small objects to S3 Glacier.",
+                        services: ["s3", "storage", "glacier"]
+                    },
+                    {
+                        title: "Amazon S3 now supports cross-account access points",
+                        link: "https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&awsf.whats-new-categories=*all&whats-new-content-all.q=s3&whats-new-content-all.q_operator=AND",
+                        date: "Aug 8, 2023",
+                        description: "Amazon S3 now supports cross-account access points, simplifying data sharing across AWS accounts while maintaining security.",
+                        services: ["s3", "storage"]
+                    },
+                    {
+                        title: "Amazon S3 Inventory now supports reporting on S3 Object Lock settings",
+                        link: "https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&awsf.whats-new-categories=*all&whats-new-content-all.q=s3&whats-new-content-all.q_operator=AND",
+                        date: "Jun 5, 2023",
+                        description: "Amazon S3 Inventory now supports reporting on S3 Object Lock settings, helping you track and audit compliance configurations.",
+                        services: ["s3", "storage"]
+                    },
+                    {
+                        title: "Amazon S3 now supports automatic cost optimization for small objects",
+                        link: "https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&awsf.whats-new-categories=*all&whats-new-content-all.q=s3&whats-new-content-all.q_operator=AND",
+                        date: "Feb 2, 2023",
+                        description: "Amazon S3 now supports automatic cost optimization for small objects, reducing storage costs for workloads with many small files.",
+                        services: ["s3", "storage"]
+                    },
+                    
+                    // DynamoDB news
+                    {
+                        title: "Amazon DynamoDB now supports 100 actions per transaction",
+                        link: "https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&awsf.whats-new-categories=*all&whats-new-content-all.q=dynamodb&whats-new-content-all.q_operator=AND",
+                        date: "Nov 26, 2023",
+                        description: "Amazon DynamoDB now supports up to 100 actions per transaction, a 10x increase from the previous limit of 10 actions.",
+                        services: ["dynamodb", "database", "nosql"]
+                    },
+            /* Old static news items - kept for reference
+                    {
+                        title: "Amazon DynamoDB now supports 25 projected attributes in Local Secondary Indexes",
+                        link: "https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&awsf.whats-new-categories=*all&whats-new-content-all.q=dynamodb&whats-new-content-all.q_operator=AND",
+                        date: "Aug 1, 2023",
+                        description: "Amazon DynamoDB now supports up to 25 projected attributes in Local Secondary Indexes, improving query flexibility.",
+                        services: ["dynamodb", "database", "nosql"]
+                    },
+                    {
+                        title: "Amazon DynamoDB now supports PartiQL batch operations",
+                        link: "https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&awsf.whats-new-categories=*all&whats-new-content-all.q=dynamodb&whats-new-content-all.q_operator=AND",
+                        date: "Mar 9, 2023",
+                        description: "Amazon DynamoDB now supports PartiQL batch operations, enabling you to perform multiple SQL-compatible operations in a single request.",
+                        services: ["dynamodb", "database", "nosql"]
+                    },
+                    {
+                        title: "Amazon DynamoDB now supports 8 KB item size in transactions",
+                        link: "https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&awsf.whats-new-categories=*all&whats-new-content-all.q=dynamodb&whats-new-content-all.q_operator=AND",
+                        date: "Nov 18, 2022",
+                        description: "Amazon DynamoDB now supports item sizes up to 8 KB in transactions, doubling the previous limit of 4 KB.",
+                        services: ["dynamodb", "database", "nosql"]
+                    },
+                    {
+                        title: "Amazon DynamoDB launches multi-Region, multi-active global tables in Asia Pacific",
+                        link: "https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&awsf.whats-new-categories=*all&whats-new-content-all.q=dynamodb&whats-new-content-all.q_operator=AND",
+                        date: "Aug 16, 2022",
+                        description: "Amazon DynamoDB launches multi-Region, multi-active global tables in the Asia Pacific region, enabling global data replication.",
+                        services: ["dynamodb", "database", "nosql", "global-tables"]
+                    }
+            */
             
             // Function to filter and display news items
             function displayNewsItems(newsItems) {
@@ -1327,25 +1545,13 @@
                     item.relevanceScore = 0;
                     
                     selectedServices.forEach(service => {
-                        const serviceRegex = new RegExp(`\\b${service}\\b`, 'i');
-                        
-                        // Check title (higher weight)
+                        // Check if service name appears in title or description
+                        const serviceRegex = new RegExp(service, 'i');
                         if (serviceRegex.test(item.title)) {
-                            item.relevanceScore += 10;
+                            item.relevanceScore += 3; // Higher weight for title matches
                         }
-                        
-                        // Check description
                         if (serviceRegex.test(item.description)) {
-                            item.relevanceScore += 5;
-                        }
-                        
-                        // Check categories if available
-                        if (item.categories && Array.isArray(item.categories)) {
-                            item.categories.forEach(category => {
-                                if (serviceRegex.test(category)) {
-                                    item.relevanceScore += 8;
-                                }
-                            });
+                            item.relevanceScore += 1; // Lower weight for description matches
                         }
                     });
                 });
@@ -1370,7 +1576,7 @@
                         
                         const newsMeta = document.createElement('div');
                         newsMeta.className = 'news-meta';
-                        newsMeta.innerHTML = `<span>${item.pubDate}</span>`;
+                        newsMeta.innerHTML = `<span>${item.date}</span>`;
                         
                         const newsDescription = document.createElement('div');
                         newsDescription.className = 'news-description';
@@ -1432,11 +1638,6 @@
                         `;
                     }
                 }
-            }
-            
-            // Function to process and display news
-            function processAndDisplayNews(rssData) {
-                // This function is no longer used
             }
         });
     </script>
