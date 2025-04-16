@@ -1312,62 +1312,96 @@
             
             // Function to fetch news items - handles both API and static data
             async function fetchNewsItems(services) {
-                // Check if we're running locally (file://) or on a server (http://)
-                const isLocalFile = window.location.protocol === 'file:';
-                
-                if (!isLocalFile) {
-                    try {
-                        // Fetch a large set of news items to ensure we get enough for any service
-                        const apiUrl = `https://aws.amazon.com/api/dirs/items/search?item.directoryId=whats-new-v2&sort_by=item.additionalFields.postDateTime&sort_order=desc&size=100&item.locale=en_US`;
+                try {
+                    // Try to use a CORS proxy to access the AWS API
+                    const apiUrl = `https://aws.amazon.com/api/dirs/items/search?item.directoryId=whats-new-v2&sort_by=item.additionalFields.postDateTime&sort_order=desc&size=100&item.locale=en_US`;
+                    const corsProxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
+                    
+                    const response = await fetch(corsProxyUrl, {
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.items && data.items.length > 0) {
+                        // Process all news items
+                        const allItems = data.items.map(item => ({
+                            title: item.item.additionalFields.headline,
+                            link: `https://aws.amazon.com${item.item.additionalFields.headlineUrl}`,
+                            date: new Date(item.item.additionalFields.postDateTime).toLocaleDateString(),
+                            description: extractDescription(item.item.additionalFields.postBody)
+                        }));
                         
-                        const response = await fetch(apiUrl, {
-                            mode: 'cors',
-                            headers: {
-                                'Accept': 'application/json'
-                            }
+                        // Filter items based on selected services
+                        const filteredItems = allItems.filter(item => {
+                            return selectedServices.some(service => {
+                                // Check if the service name appears in the title
+                                const serviceRegex = new RegExp(service, 'i');
+                                return serviceRegex.test(item.title);
+                            });
                         });
                         
-                        const data = await response.json();
+                        console.log("Selected services:", selectedServices);
+                        console.log("Filtered items count:", filteredItems.length);
                         
-                        if (data.items && data.items.length > 0) {
-                            // Process all news items
-                            const allItems = data.items.map(item => ({
-                                title: item.item.additionalFields.headline,
-                                link: `https://aws.amazon.com${item.item.additionalFields.headlineUrl}`,
-                                date: new Date(item.item.additionalFields.postDateTime).toLocaleDateString(),
-                                description: extractDescription(item.item.additionalFields.postBody)
-                            }));
-                            
-                            // Filter items based on selected services
-                            const filteredItems = allItems.filter(item => {
-                                return selectedServices.some(service => {
-                                    // Check if the service name appears in the title
-                                    const serviceRegex = new RegExp(service, 'i');
-                                    return serviceRegex.test(item.title);
-                                });
-                            });
-                            
-                            console.log("Selected services:", selectedServices);
-                            console.log("Filtered items count:", filteredItems.length);
-                            
-                            // Return filtered items or general news if no matches
-                            return filteredItems.length > 0 ? filteredItems.slice(0, 5) : allItems.slice(0, 5);
-                        }
-                    } catch (error) {
-                        console.warn('API fetch failed:', error);
-                        return []; // Return empty array if API fails
+                        // Return filtered items or general news if no matches
+                        return filteredItems.length > 0 ? filteredItems.slice(0, 5) : allItems.slice(0, 5);
                     }
-                } else {
-                    // For local testing, show a message about CORS limitations
-                    return [{
-                        title: "News feed unavailable in local testing due to CORS restrictions",
-                        link: "#",
-                        date: new Date().toLocaleDateString(),
-                        description: "When testing locally, news cannot be fetched due to browser security restrictions. Deploy to a server to see live news."
-                    }];
+                } catch (error) {
+                    console.warn('API fetch failed:', error);
+                    // Fall through to the fallback approach
                 }
                 
-                return []; // Fallback empty array
+                // Fallback: Use RSS feed which typically has fewer CORS restrictions
+                try {
+                    const rssUrl = 'https://aws.amazon.com/new/feed/';
+                    const corsProxyRssUrl = `https://corsproxy.io/?${encodeURIComponent(rssUrl)}`;
+                    
+                    const response = await fetch(corsProxyRssUrl);
+                    const text = await response.text();
+                    
+                    // Parse the RSS XML
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(text, "text/xml");
+                    const items = xmlDoc.querySelectorAll("item");
+                    
+                    // Convert RSS items to our format
+                    const allItems = Array.from(items).map(item => {
+                        const title = item.querySelector("title").textContent;
+                        const link = item.querySelector("link").textContent;
+                        const pubDate = new Date(item.querySelector("pubDate").textContent);
+                        const description = item.querySelector("description").textContent;
+                        
+                        return {
+                            title,
+                            link,
+                            date: pubDate.toLocaleDateString(),
+                            description: extractDescription(description)
+                        };
+                    });
+                    
+                    // Filter items based on selected services
+                    const filteredItems = allItems.filter(item => {
+                        return selectedServices.some(service => {
+                            const serviceRegex = new RegExp(service, 'i');
+                            return serviceRegex.test(item.title);
+                        });
+                    });
+                    
+                    return filteredItems.length > 0 ? filteredItems.slice(0, 5) : allItems.slice(0, 5);
+                } catch (error) {
+                    console.warn('RSS fetch failed:', error);
+                }
+                
+                // Final fallback: Show a message about the issue
+                return [{
+                    title: "Unable to fetch AWS news due to CORS restrictions",
+                    link: "https://aws.amazon.com/new/",
+                    date: new Date().toLocaleDateString(),
+                    description: "News could not be loaded due to cross-origin restrictions. Click to visit the AWS What's New page directly."
+                }];
             }
             
             // Helper function to extract a short description from HTML content
