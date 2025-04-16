@@ -1220,7 +1220,7 @@
                     .replace(/'/g, "&#039;");
             }
             
-            // Function to fetch and display AWS news related to selected services
+            // Function to update news section based on selected services
             async function updateNewsSection() {
                 if (selectedServices.length === 0) {
                     newsSection.style.display = 'none';
@@ -1236,76 +1236,58 @@
                 `;
                 
                 try {
-                    // Use a CORS proxy if needed
-                    const rssUrl = 'https://aws.amazon.com/blogs/aws/feed/';
-                    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(rssUrl)}`;
-                    
                     // Check if we have cached news data
-                    let rssData;
-                    if (!newsCache.rssData) {
-                        const response = await fetch(proxyUrl);
+                    let newsItems;
+                    if (!newsCache.newsItems) {
+                        // Fetch AWS blog posts from their JSON API
+                        const response = await fetch('https://aws.amazon.com/api/dirs/items/search?item.directoryId=blog-posts&sort_by=item.additionalFields.createdDate&sort_order=desc&size=20&item.locale=en_US');
+                        
                         if (!response.ok) {
-                            throw new Error('Failed to fetch AWS news');
+                            throw new Error(`Failed to fetch AWS news: ${response.status}`);
                         }
                         
-                        const text = await response.text();
-                        const parser = new DOMParser();
-                        rssData = parser.parseFromString(text, 'text/xml');
+                        const data = await response.json();
                         
-                        // Cache the RSS data
-                        newsCache.rssData = rssData;
+                        // Process the JSON data
+                        newsItems = data.items.map(item => ({
+                            title: item.item.additionalFields.title,
+                            link: `https://aws.amazon.com${item.item.additionalFields.relativePath}`,
+                            pubDate: new Date(item.item.additionalFields.createdDate).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric'
+                            }),
+                            description: item.item.additionalFields.postExcerpt || item.item.additionalFields.description,
+                            categories: item.item.additionalFields.categories || []
+                        }));
                         
-                        // Process the RSS data immediately to avoid the spinning indicator
-                        processAndDisplayNews(rssData);
+                        // Cache the news items
+                        newsCache.newsItems = newsItems;
                     } else {
                         // Use cached data
-                        processAndDisplayNews(newsCache.rssData);
+                        newsItems = newsCache.newsItems;
                     }
+                    
+                    // Filter and display news items
+                    displayNewsItems(newsItems);
+                    
                 } catch (error) {
                     console.error('Error fetching AWS news:', error);
                     newsContent.innerHTML = `
                         <div class="news-error">
                             <p>Error loading AWS news: ${error.message}</p>
-                            <p>This may be due to CORS restrictions. Try using a browser extension that allows CORS.</p>
+                            <p>Please try refreshing the page or check your internet connection.</p>
                         </div>
                     `;
                 }
             }
             
-            // Function to process and display news
-            function processAndDisplayNews(rssData) {
-                // Extract items
-                const items = rssData.querySelectorAll('item');
-                const newsItems = Array.from(items).map(item => {
-                    const title = item.querySelector('title')?.textContent || '';
-                    const link = item.querySelector('link')?.textContent || '';
-                    const pubDate = item.querySelector('pubDate')?.textContent || '';
-                    const description = item.querySelector('description')?.textContent || '';
-                    
-                    // Extract text content from description HTML
-                    const tempDiv = document.createElement('div');
-                    tempDiv.innerHTML = description;
-                    const textDescription = tempDiv.textContent || '';
-                    
-                    // Format date
-                    const date = new Date(pubDate);
-                    const formattedDate = date.toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric'
-                    });
-                    
-                    return {
-                        title,
-                        link,
-                        pubDate: formattedDate,
-                        description: textDescription,
-                        relevanceScore: 0 // Will be calculated based on selected services
-                    };
-                });
-                
+            // Function to filter and display news items
+            function displayNewsItems(newsItems) {
                 // Calculate relevance score for each news item based on selected services
                 newsItems.forEach(item => {
+                    item.relevanceScore = 0;
+                    
                     selectedServices.forEach(service => {
                         const serviceRegex = new RegExp(`\\b${service}\\b`, 'i');
                         
@@ -1317,6 +1299,15 @@
                         // Check description
                         if (serviceRegex.test(item.description)) {
                             item.relevanceScore += 5;
+                        }
+                        
+                        // Check categories if available
+                        if (item.categories && Array.isArray(item.categories)) {
+                            item.categories.forEach(category => {
+                                if (serviceRegex.test(category)) {
+                                    item.relevanceScore += 8;
+                                }
+                            });
                         }
                     });
                 });
@@ -1345,10 +1336,10 @@
                         
                         const newsDescription = document.createElement('div');
                         newsDescription.className = 'news-description';
-                        // Truncate description to ~150 characters
-                        const truncatedDesc = item.description.length > 150 
+                        // Truncate description to ~150 characters if needed
+                        const truncatedDesc = item.description && item.description.length > 150 
                             ? item.description.substring(0, 150) + '...' 
-                            : item.description;
+                            : item.description || '';
                         newsDescription.textContent = truncatedDesc;
                         
                         newsItem.appendChild(newsTitle);
@@ -1358,12 +1349,58 @@
                         newsContent.appendChild(newsItem);
                     });
                 } else {
-                    newsContent.innerHTML = `
-                        <div class="no-results">
-                            <p>No relevant news found for the selected services.</p>
-                        </div>
-                    `;
+                    // If no relevant news, show the 5 most recent items
+                    if (newsItems.length > 0) {
+                        newsContent.innerHTML = `
+                            <div class="no-results">
+                                <p>No news specifically about ${selectedServices.join(', ')} found.</p>
+                                <p>Showing recent AWS news instead:</p>
+                            </div>
+                        `;
+                        
+                        const recentItems = newsItems.slice(0, 5);
+                        
+                        recentItems.forEach(item => {
+                            const newsItem = document.createElement('div');
+                            newsItem.className = 'news-item';
+                            newsItem.style.marginTop = '15px';
+                            
+                            const newsTitle = document.createElement('div');
+                            newsTitle.className = 'news-title';
+                            newsTitle.innerHTML = `<a href="${item.link}" target="_blank">${item.title}</a>`;
+                            
+                            const newsMeta = document.createElement('div');
+                            newsMeta.className = 'news-meta';
+                            newsMeta.innerHTML = `<span>${item.pubDate}</span>`;
+                            
+                            const newsDescription = document.createElement('div');
+                            newsDescription.className = 'news-description';
+                            const truncatedDesc = item.description && item.description.length > 150 
+                                ? item.description.substring(0, 150) + '...' 
+                                : item.description || '';
+                            newsDescription.textContent = truncatedDesc;
+                            
+                            newsItem.appendChild(newsTitle);
+                            newsItem.appendChild(newsMeta);
+                            newsItem.appendChild(newsDescription);
+                            
+                            newsContent.appendChild(newsItem);
+                        });
+                    } else {
+                        newsContent.innerHTML = `
+                            <div class="no-results">
+                                <p>No AWS news items available.</p>
+                            </div>
+                        `;
+                    }
                 }
+            }
+            }
+            
+            // Function to process and display news
+            function processAndDisplayNews(rssData) {
+                // This function is no longer used with the JSON API approach
+                // Kept for reference in case we need to switch back to RSS
             }
         });
     </script>
