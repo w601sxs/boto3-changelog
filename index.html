@@ -4,17 +4,40 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Boto3 Changelog Viewer</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: #0070f3;
-            --primary-light: #e6f0ff;
-            --secondary: #f5f5f5;
-            --text: #333;
-            --text-light: #666;
-            --border: #eaeaea;
-            --success: #10b981;
-            --success-light: #ecfdf5;
+            /* Cloudscape color palette */
+            --color-background-container-content: #ffffff;
+            --color-background-layout-main: #f2f3f3;
+            --color-text-body-default: #000716;
+            --color-text-label: #414d5c;
+            --color-text-interactive-default: #0972d3;
+            --color-text-interactive-hover: #033160;
+            --color-border-divider-default: #e9ebed;
+            --color-border-control-default: #7d8998;
+            --color-border-control-hover: #414d5c;
+            --color-background-dropdown-item-hover: #f2f8fd;
+            --color-background-button-primary-default: #0972d3;
+            --color-background-button-primary-hover: #033160;
+            --color-background-status-info: #f2f8fd;
+            --color-text-status-info: #0972d3;
+            --color-background-status-success: #f2fcf3;
+            --color-text-status-success: #037f0c;
+            --color-background-status-warning: #fff8e6;
+            --color-text-status-warning: #8d6605;
+            
+            /* AWS brand color */
+            --aws-orange: #FF9900;
+            --aws-orange-light: #FFF5E6;
+            
+            /* Spacing and sizing */
+            --space-xs: 4px;
+            --space-s: 8px;
+            --space-m: 16px;
+            --space-l: 20px;
+            --space-xl: 24px;
+            --space-xxl: 32px;
             --radius: 8px;
             --timeline-width: 2px;
             --dot-size: 24px;
@@ -27,48 +50,79 @@
         }
 
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-            color: var(--text);
+            font-family: 'Amazon Ember', 'Helvetica Neue', Roboto, Arial, sans-serif;
+            color: var(--color-text-body-default);
             line-height: 1.6;
-            background-color: #f9fafb;
-            padding: 20px;
+            background-color: var(--color-background-layout-main);
+            padding: var(--space-l);
         }
 
         .container {
-            max-width: 1000px;
+            max-width: 1200px;
             margin: 0 auto;
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: var(--space-l);
+        }
+
+        .content-wrapper {
+            display: flex;
+            gap: var(--space-l);
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-l);
+        }
+
+        .sidebar {
+            width: 350px;
+            align-self: flex-start;
+            position: sticky;
+            top: var(--space-l);
+        }
+
+        @media (max-width: 1024px) {
+            .content-wrapper {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                position: static;
+            }
         }
 
         .header {
-            background-color: white;
-            padding: 24px;
+            background-color: var(--color-background-container-content);
+            padding: var(--space-xl);
             border-radius: var(--radius);
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: var(--space-m);
         }
 
         h1 {
             font-size: 1.8rem;
-            margin-bottom: 0.5rem;
-            color: var(--text);
+            font-weight: 700;
+            margin-bottom: var(--space-xs);
+            color: var(--color-text-body-default);
         }
 
         .controls {
             display: flex;
             flex-wrap: wrap;
-            gap: 15px;
-            margin-bottom: 10px;
+            gap: var(--space-m);
+            margin-bottom: var(--space-s);
         }
 
         .input-group {
             display: flex;
             flex-direction: column;
-            gap: 5px;
+            gap: var(--space-xs);
             flex: 1;
             min-width: 250px;
         }
@@ -76,26 +130,27 @@
         label {
             font-weight: 500;
             font-size: 0.9rem;
-            color: var(--text);
+            color: var(--color-text-label);
         }
 
         input, select {
-            padding: 10px 12px;
+            padding: var(--space-s) var(--space-m);
             border-radius: var(--radius);
-            border: 1px solid var(--border);
+            border: 1px solid var(--color-border-control-default);
             font-size: 0.9rem;
             width: 100%;
+            font-family: inherit;
         }
 
         input:focus, select:focus {
             outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 2px rgba(0, 112, 243, 0.1);
+            border-color: var(--color-text-interactive-default);
+            box-shadow: 0 0 0 2px rgba(9, 114, 211, 0.1);
         }
 
         button {
-            padding: 10px 16px;
-            background-color: var(--primary);
+            padding: var(--space-s) var(--space-l);
+            background-color: var(--color-background-button-primary-default);
             color: white;
             border: none;
             border-radius: var(--radius);
@@ -104,19 +159,20 @@
             transition: background-color 0.2s;
             height: 40px;
             align-self: flex-end;
+            font-family: inherit;
         }
 
         button:hover {
-            background-color: #005cc5;
+            background-color: var(--color-background-button-primary-hover);
         }
 
         .loading {
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 40px;
-            color: var(--text-light);
-            background-color: white;
+            padding: var(--space-xxl);
+            color: var(--color-text-label);
+            background-color: var(--color-background-container-content);
             border-radius: var(--radius);
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
         }
@@ -124,11 +180,11 @@
         .spinner {
             border: 3px solid rgba(0, 0, 0, 0.1);
             border-radius: 50%;
-            border-top: 3px solid var(--primary);
+            border-top: 3px solid var(--color-text-interactive-default);
             width: 24px;
             height: 24px;
             animation: spin 1s linear infinite;
-            margin-right: 10px;
+            margin-right: var(--space-s);
         }
 
         @keyframes spin {
@@ -140,8 +196,8 @@
             display: flex;
             flex-direction: column;
             gap: 0;
-            padding: 20px;
-            background-color: white;
+            padding: var(--space-l);
+            background-color: var(--color-background-container-content);
             border-radius: var(--radius);
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
         }
@@ -164,7 +220,7 @@
             top: 0;
             bottom: 0;
             width: var(--timeline-width);
-            background-color: #e5e7eb;
+            background-color: var(--color-border-divider-default);
             z-index: 0;
         }
 
@@ -178,7 +234,7 @@
             top: 0;
             width: var(--dot-size);
             height: var(--dot-size);
-            background-color: var(--success);
+            background-color: var(--color-text-interactive-default);
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -190,7 +246,7 @@
         }
 
         .timeline-content {
-            background-color: white;
+            background-color: var(--color-background-container-content);
             border-radius: var(--radius);
             overflow: hidden;
         }
@@ -199,30 +255,30 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 10px;
+            margin-bottom: var(--space-s);
         }
 
         .timeline-title {
             font-size: 1.1rem;
             font-weight: 600;
-            color: var(--text);
-            margin-bottom: 5px;
+            color: var(--color-text-body-default);
+            margin-bottom: var(--space-xs);
         }
 
         .timeline-date {
             font-size: 0.85rem;
-            color: var(--text-light);
-            margin-left: 10px;
+            color: var(--color-text-label);
+            margin-left: var(--space-s);
         }
 
         .timeline-links {
             display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
+            gap: var(--space-s);
+            margin-bottom: var(--space-m);
         }
 
         .timeline-link {
-            color: var(--primary);
+            color: var(--color-text-interactive-default);
             text-decoration: none;
             font-size: 0.85rem;
             display: inline-flex;
@@ -230,24 +286,25 @@
         }
 
         .timeline-link:hover {
+            color: var(--color-text-interactive-hover);
             text-decoration: underline;
         }
 
         .timeline-link svg {
-            margin-right: 5px;
+            margin-right: var(--space-xs);
             width: 16px;
             height: 16px;
         }
 
         .timeline-changes {
-            border-top: 1px solid var(--border);
-            padding-top: 15px;
+            border-top: 1px solid var(--color-border-divider-default);
+            padding-top: var(--space-m);
         }
 
         .change-item {
-            margin-bottom: 12px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid var(--border);
+            margin-bottom: var(--space-m);
+            padding-bottom: var(--space-m);
+            border-bottom: 1px solid var(--color-border-divider-default);
         }
 
         .change-item:last-child {
@@ -258,26 +315,26 @@
 
         .service-tag {
             display: inline-block;
-            background-color: var(--primary-light);
-            color: var(--primary);
-            padding: 2px 8px;
+            background-color: var(--color-background-status-info);
+            color: var(--color-text-status-info);
+            padding: 2px var(--space-s);
             border-radius: 4px;
             font-size: 0.8rem;
             font-weight: 500;
-            margin-right: 8px;
-            margin-bottom: 5px;
+            margin-right: var(--space-s);
+            margin-bottom: var(--space-xs);
         }
 
         .change-description {
-            margin-top: 5px;
+            margin-top: var(--space-xs);
             white-space: pre-wrap;
         }
 
         .no-results {
             text-align: center;
-            padding: 40px;
-            color: var(--text-light);
-            background-color: white;
+            padding: var(--space-xxl);
+            color: var(--color-text-label);
+            background-color: var(--color-background-container-content);
             border-radius: var(--radius);
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
         }
@@ -288,38 +345,38 @@
         }
 
         .multiselect-input {
-            padding: 10px 12px;
+            padding: var(--space-s) var(--space-m);
             border-radius: var(--radius);
-            border: 1px solid var(--border);
+            border: 1px solid var(--color-border-control-default);
             font-size: 0.9rem;
             width: 100%;
             cursor: pointer;
             display: flex;
             flex-wrap: wrap;
-            gap: 5px;
+            gap: var(--space-xs);
             min-height: 40px;
-            background-color: white;
+            background-color: var(--color-background-container-content);
         }
 
         .multiselect-input:focus {
             outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 2px rgba(0, 112, 243, 0.1);
+            border-color: var(--color-text-interactive-default);
+            box-shadow: 0 0 0 2px rgba(9, 114, 211, 0.1);
         }
 
         .selected-item {
             display: inline-flex;
             align-items: center;
-            background-color: var(--primary-light);
-            color: var(--primary);
-            padding: 2px 8px;
+            background-color: var(--color-background-status-info);
+            color: var(--color-text-status-info);
+            padding: 2px var(--space-s);
             border-radius: 4px;
             font-size: 0.8rem;
-            margin-right: 5px;
+            margin-right: var(--space-xs);
         }
 
         .remove-item {
-            margin-left: 5px;
+            margin-left: var(--space-xs);
             cursor: pointer;
             font-weight: bold;
         }
@@ -331,8 +388,8 @@
             width: 100%;
             max-height: 300px;
             overflow-y: auto;
-            background-color: white;
-            border: 1px solid var(--border);
+            background-color: var(--color-background-container-content);
+            border: 1px solid var(--color-border-control-default);
             border-radius: var(--radius);
             z-index: 10;
             display: none;
@@ -344,33 +401,34 @@
         }
 
         .search-box {
-            padding: 10px;
+            padding: var(--space-s);
             position: sticky;
             top: 0;
-            background-color: white;
-            border-bottom: 1px solid var(--border);
+            background-color: var(--color-background-container-content);
+            border-bottom: 1px solid var(--color-border-divider-default);
         }
 
         .search-input {
             width: 100%;
-            padding: 8px 12px;
+            padding: var(--space-s) var(--space-m);
             border-radius: var(--radius);
-            border: 1px solid var(--border);
+            border: 1px solid var(--color-border-control-default);
             font-size: 0.9rem;
+            font-family: inherit;
         }
 
         .dropdown-item {
-            padding: 8px 12px;
+            padding: var(--space-s) var(--space-m);
             cursor: pointer;
         }
 
         .dropdown-item:hover {
-            background-color: var(--secondary);
+            background-color: var(--color-background-dropdown-item-hover);
         }
 
         .dropdown-item.selected {
-            background-color: var(--primary-light);
-            color: var(--primary);
+            background-color: var(--color-background-status-info);
+            color: var(--color-text-status-info);
         }
 
         .version-info {
@@ -393,19 +451,19 @@
         }
 
         .debug-info {
-            margin-top: 10px;
-            padding: 10px;
-            background-color: #f8f8f8;
+            margin-top: var(--space-s);
+            padding: var(--space-s);
+            background-color: var(--color-background-layout-main);
             border-radius: var(--radius);
             font-size: 0.85rem;
-            color: var(--text-light);
+            color: var(--color-text-label);
         }
 
         .raw-line {
             font-family: monospace;
             white-space: pre;
             overflow-x: auto;
-            padding: 4px;
+            padding: var(--space-xs);
             background-color: #f0f0f0;
             margin: 2px 0;
             border-radius: 4px;
@@ -417,27 +475,106 @@
         }
 
         .share-link {
-            margin-top: 10px;
-            padding: 10px;
-            background-color: var(--secondary);
+            margin-top: var(--space-s);
+            padding: var(--space-s);
+            background-color: var(--color-background-layout-main);
             border-radius: var(--radius);
             font-size: 0.85rem;
         }
 
         .share-link input {
             width: 100%;
-            padding: 8px;
+            padding: var(--space-s);
             border-radius: 4px;
-            border: 1px solid var(--border);
+            border: 1px solid var(--color-border-control-default);
             font-size: 0.85rem;
-            margin-top: 5px;
+            margin-top: var(--space-xs);
+            font-family: inherit;
         }
 
         .copy-message {
-            color: var(--success);
-            margin-top: 5px;
+            color: var(--color-text-status-success);
+            margin-top: var(--space-xs);
             font-size: 0.8rem;
             display: none;
+        }
+
+        .news-section {
+            background-color: var(--color-background-container-content);
+            padding: var(--space-xl);
+            border-radius: var(--radius);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            margin-bottom: var(--space-l);
+        }
+
+        .news-section h2 {
+            font-size: 1.4rem;
+            margin-bottom: var(--space-m);
+            color: var(--color-text-body-default);
+            border-bottom: 2px solid var(--color-text-interactive-default);
+            padding-bottom: var(--space-s);
+        }
+
+        .news-items {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-m);
+        }
+
+        .news-item {
+            padding: var(--space-m);
+            border: 1px solid var(--color-border-divider-default);
+            border-radius: var(--radius);
+            transition: all 0.2s;
+        }
+
+        .news-item:hover {
+            border-color: var(--color-text-interactive-default);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .news-title {
+            font-weight: 600;
+            margin-bottom: var(--space-s);
+            color: var(--color-text-interactive-default);
+        }
+
+        .news-title a {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .news-title a:hover {
+            text-decoration: underline;
+            color: var(--color-text-interactive-hover);
+        }
+
+        .news-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: var(--color-text-label);
+            margin-bottom: var(--space-s);
+        }
+
+        .news-description {
+            font-size: 0.95rem;
+            color: var(--color-text-body-default);
+            margin-bottom: var(--space-s);
+        }
+
+        .news-loading {
+            text-align: center;
+            padding: var(--space-l);
+            color: var(--color-text-label);
+        }
+
+        .news-error {
+            padding: var(--space-m);
+            color: #d91515;
+            background-color: #fff0f0;
+            border-radius: var(--radius);
+            border: 1px solid #ffd7d7;
         }
     </style>
 </head>
@@ -480,12 +617,27 @@
             </div>
         </div>
 
-        <div id="loading" class="loading">
-            <div class="spinner"></div>
-            <span>Loading changelog data...</span>
-        </div>
+        <div class="content-wrapper">
+            <div class="main-content">
+                <div id="loading" class="loading">
+                    <div class="spinner"></div>
+                    <span>Loading changelog data...</span>
+                </div>
 
-        <div id="timeline" class="timeline"></div>
+                <div id="timeline" class="timeline"></div>
+            </div>
+            
+            <!-- AWS News Sidebar -->
+            <div id="news-section" class="news-section sidebar" style="display: none;">
+                <h2>Related AWS News</h2>
+                <div id="news-content" class="news-items">
+                    <div class="news-loading">
+                        <div class="spinner"></div>
+                        <span>Loading news...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -501,11 +653,14 @@
             const shareLink = document.getElementById('share-link');
             const shareUrl = document.getElementById('share-url');
             const copyMessage = document.getElementById('copy-message');
+            const newsSection = document.getElementById('news-section');
+            const newsContent = document.getElementById('news-content');
 
             let changelogData = null;
             let services = [];
             let selectedServices = []; // Will be populated from URL or default to 'bedrock'
             let rawText = ''; // Store raw text for debugging
+            let newsCache = {}; // Cache for news items
             
             // Parse URL parameters
             function getUrlParams() {
@@ -760,15 +915,30 @@
 
             // Function to extract unique services
             function extractServices(versions) {
-                const serviceSet = new Set();
+                const serviceMap = new Map(); // Use a map to normalize service names
                 
                 versions.forEach(version => {
                     version.changes.forEach(change => {
-                        serviceSet.add(change.service);
+                        // Extract base service name (everything before the first dot)
+                        let serviceName = change.service;
+                        if (serviceName.includes('.')) {
+                            serviceName = serviceName.split('.')[0];
+                        }
+                        
+                        // Normalize service name to lowercase for comparison
+                        const normalizedName = serviceName.toLowerCase();
+                        
+                        // Keep the original casing for display, but avoid duplicates
+                        if (!serviceMap.has(normalizedName)) {
+                            serviceMap.set(normalizedName, serviceName);
+                        }
                     });
                 });
                 
-                return Array.from(serviceSet).sort();
+                // Convert map values to array and sort case-insensitive
+                return Array.from(serviceMap.values()).sort((a, b) => 
+                    a.toLowerCase().localeCompare(b.toLowerCase())
+                );
             }
 
             // Function to populate service dropdown
@@ -861,9 +1031,15 @@
                     version.changes.forEach(change => {
                         const matchesService = selectedServices.some(selectedService => {
                             const selectedLower = selectedService.toLowerCase();
-                            const serviceLower = change.service.toLowerCase();
                             
-                            // Exact match
+                            // Extract base service name (everything before the first dot)
+                            let serviceName = change.service;
+                            if (serviceName.includes('.')) {
+                                serviceName = serviceName.split('.')[0];
+                            }
+                            const serviceLower = serviceName.toLowerCase();
+                            
+                            // Exact match (case-insensitive)
                             if (serviceLower === selectedLower) return true;
                             
                             // Service group match with more precise logic:
@@ -890,6 +1066,9 @@
                     
                     return clonedVersion;
                 }).filter(version => version.changes.length > 0);
+                
+                // Update news section based on selected services
+                updateNewsSection();
                 
                 if (filteredVersions.length === 0) {
                     // Add debug info to help troubleshoot
@@ -1039,6 +1218,152 @@
                     .replace(/>/g, "&gt;")
                     .replace(/"/g, "&quot;")
                     .replace(/'/g, "&#039;");
+            }
+            
+            // Function to fetch and display AWS news related to selected services
+            async function updateNewsSection() {
+                if (selectedServices.length === 0) {
+                    newsSection.style.display = 'none';
+                    return;
+                }
+                
+                newsSection.style.display = 'block';
+                newsContent.innerHTML = `
+                    <div class="news-loading">
+                        <div class="spinner"></div>
+                        <span>Loading news...</span>
+                    </div>
+                `;
+                
+                try {
+                    // Use a CORS proxy if needed
+                    const rssUrl = 'https://aws.amazon.com/blogs/aws/feed/';
+                    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(rssUrl)}`;
+                    
+                    // Check if we have cached news data
+                    let rssData;
+                    if (!newsCache.rssData) {
+                        const response = await fetch(proxyUrl);
+                        if (!response.ok) {
+                            throw new Error('Failed to fetch AWS news');
+                        }
+                        
+                        const text = await response.text();
+                        const parser = new DOMParser();
+                        rssData = parser.parseFromString(text, 'text/xml');
+                        
+                        // Cache the RSS data
+                        newsCache.rssData = rssData;
+                        
+                        // Process the RSS data immediately to avoid the spinning indicator
+                        processAndDisplayNews(rssData);
+                    } else {
+                        // Use cached data
+                        processAndDisplayNews(newsCache.rssData);
+                    }
+                } catch (error) {
+                    console.error('Error fetching AWS news:', error);
+                    newsContent.innerHTML = `
+                        <div class="news-error">
+                            <p>Error loading AWS news: ${error.message}</p>
+                            <p>This may be due to CORS restrictions. Try using a browser extension that allows CORS.</p>
+                        </div>
+                    `;
+                }
+            }
+            
+            // Function to process and display news
+            function processAndDisplayNews(rssData) {
+                // Extract items
+                const items = rssData.querySelectorAll('item');
+                const newsItems = Array.from(items).map(item => {
+                    const title = item.querySelector('title')?.textContent || '';
+                    const link = item.querySelector('link')?.textContent || '';
+                    const pubDate = item.querySelector('pubDate')?.textContent || '';
+                    const description = item.querySelector('description')?.textContent || '';
+                    
+                    // Extract text content from description HTML
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = description;
+                    const textDescription = tempDiv.textContent || '';
+                    
+                    // Format date
+                    const date = new Date(pubDate);
+                    const formattedDate = date.toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                    });
+                    
+                    return {
+                        title,
+                        link,
+                        pubDate: formattedDate,
+                        description: textDescription,
+                        relevanceScore: 0 // Will be calculated based on selected services
+                    };
+                });
+                
+                // Calculate relevance score for each news item based on selected services
+                newsItems.forEach(item => {
+                    selectedServices.forEach(service => {
+                        const serviceRegex = new RegExp(`\\b${service}\\b`, 'i');
+                        
+                        // Check title (higher weight)
+                        if (serviceRegex.test(item.title)) {
+                            item.relevanceScore += 10;
+                        }
+                        
+                        // Check description
+                        if (serviceRegex.test(item.description)) {
+                            item.relevanceScore += 5;
+                        }
+                    });
+                });
+                
+                // Sort by relevance score and limit to top 5
+                const relevantNews = newsItems
+                    .filter(item => item.relevanceScore > 0)
+                    .sort((a, b) => b.relevanceScore - a.relevanceScore)
+                    .slice(0, 5);
+                
+                // Display relevant news
+                if (relevantNews.length > 0) {
+                    newsContent.innerHTML = '';
+                    
+                    relevantNews.forEach(item => {
+                        const newsItem = document.createElement('div');
+                        newsItem.className = 'news-item';
+                        
+                        const newsTitle = document.createElement('div');
+                        newsTitle.className = 'news-title';
+                        newsTitle.innerHTML = `<a href="${item.link}" target="_blank">${item.title}</a>`;
+                        
+                        const newsMeta = document.createElement('div');
+                        newsMeta.className = 'news-meta';
+                        newsMeta.innerHTML = `<span>${item.pubDate}</span>`;
+                        
+                        const newsDescription = document.createElement('div');
+                        newsDescription.className = 'news-description';
+                        // Truncate description to ~150 characters
+                        const truncatedDesc = item.description.length > 150 
+                            ? item.description.substring(0, 150) + '...' 
+                            : item.description;
+                        newsDescription.textContent = truncatedDesc;
+                        
+                        newsItem.appendChild(newsTitle);
+                        newsItem.appendChild(newsMeta);
+                        newsItem.appendChild(newsDescription);
+                        
+                        newsContent.appendChild(newsItem);
+                    });
+                } else {
+                    newsContent.innerHTML = `
+                        <div class="no-results">
+                            <p>No relevant news found for the selected services.</p>
+                        </div>
+                    `;
+                }
             }
         });
     </script>
