@@ -1509,10 +1509,6 @@
                 // Return service-specific news if available, otherwise general news
                 return (service && serviceNews[service]) || latestNews;
             }
-                    link: "https://aws.amazon.com/new/",
-                    date: new Date().toLocaleDateString(),
-                    description: "News could not be loaded due to cross-origin restrictions. Click to visit the AWS What's New page directly."
-                }];
             }
             
             // Helper function to extract a short description from HTML content
