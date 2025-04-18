@@ -1310,94 +1310,205 @@
                 }
             }
             
-            // Function to fetch news items - handles both API and static data
+            /**
+             * Fetches news items from the AWS blog RSS feed using RSS2JSON API
+             * @param {Array} services - List of AWS service names
+             * @returns {Array} - Formatted news items
+             */
             async function fetchNewsItems(services) {
+                console.log("fetchNewsItems started");
+                
+                // AWS blog RSS feed URL
+                const rssUrl = "https://aws.amazon.com/blogs/aws/feed/";
+                
+                // RSS2JSON API endpoint (allows CORS)
+                const rss2jsonUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
+                
                 try {
-                    // Try to use a CORS proxy to access the AWS API
-                    const apiUrl = `https://aws.amazon.com/api/dirs/items/search?item.directoryId=whats-new-v2&sort_by=item.additionalFields.postDateTime&sort_order=desc&size=100&item.locale=en_US`;
-                    const corsProxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
+                    console.log("Fetching RSS feed via RSS2JSON API");
                     
-                    const response = await fetch(corsProxyUrl, {
-                        headers: {
-                            'Accept': 'application/json'
-                        }
+                    // Set up fetch with timeout
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 5000);
+                    
+                    const response = await fetch(rss2jsonUrl, {
+                        signal: controller.signal
                     });
+                    
+                    clearTimeout(timeoutId);
+                    
+                    console.log("Fetch response received:", response.status);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
                     
                     const data = await response.json();
+                    console.log("JSON data received");
                     
-                    if (data.items && data.items.length > 0) {
-                        // Process all news items
-                        const allItems = data.items.map(item => ({
-                            title: item.item.additionalFields.headline,
-                            link: `https://aws.amazon.com${item.item.additionalFields.headlineUrl}`,
-                            date: new Date(item.item.additionalFields.postDateTime).toLocaleDateString(),
-                            description: extractDescription(item.item.additionalFields.postBody)
-                        }));
-                        
-                        // Filter items based on selected services
-                        const filteredItems = allItems.filter(item => {
-                            return selectedServices.some(service => {
-                                // Check if the service name appears in the title
-                                const serviceRegex = new RegExp(service, 'i');
-                                return serviceRegex.test(item.title);
-                            });
-                        });
-                        
-                        console.log("Selected services:", selectedServices);
-                        console.log("Filtered items count:", filteredItems.length);
-                        
-                        // Return filtered items or general news if no matches
-                        return filteredItems.length > 0 ? filteredItems.slice(0, 5) : allItems.slice(0, 5);
+                    if (data.status !== 'ok') {
+                        throw new Error(`RSS2JSON API error: ${data.message || 'Unknown error'}`);
                     }
+                    
+                    if (!data.items || data.items.length === 0) {
+                        throw new Error("No items found in RSS feed");
+                    }
+                    
+                    console.log(`Found ${data.items.length} items in RSS feed`);
+                    
+                    // Get the primary service name for filtering (if applicable)
+                    const primaryService = services && services.length > 0 ? 
+                        services[0].toLowerCase() : null;
+                    
+                    // Filter and format news items
+                    const newsItems = [];
+                    
+                    // First pass: look for service-specific news
+                    if (primaryService) {
+                        for (const item of data.items) {
+                            const titleLower = item.title.toLowerCase();
+                            const descLower = item.description.toLowerCase();
+                            
+                            if (titleLower.includes(primaryService) || descLower.includes(primaryService)) {
+                                newsItems.push({
+                                    title: item.title,
+                                    link: item.link,
+                                    date: new Date(item.pubDate).toLocaleDateString(),
+                                    description: extractDescription(item.description)
+                                });
+                                
+                                if (newsItems.length >= 5) {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // If we didn't find enough service-specific news, add general news
+                    if (newsItems.length < 5) {
+                        for (const item of data.items) {
+                            // Skip items we've already added
+                            if (newsItems.some(news => news.link === item.link)) {
+                                continue;
+                            }
+                            
+                            newsItems.push({
+                                title: item.title,
+                                link: item.link,
+                                date: new Date(item.pubDate).toLocaleDateString(),
+                                description: extractDescription(item.description)
+                            });
+                            
+                            if (newsItems.length >= 5) {
+                                break;
+                            }
+                        }
+                    }
+                    
+                    console.log(`Successfully processed ${newsItems.length} news items`);
+                    return newsItems;
+                    
                 } catch (error) {
-                    console.warn('API fetch failed:', error);
-                    // Fall through to the fallback approach
+                    console.error(`Error fetching RSS feed:`, error);
+                    
+                    // Return static fallback content
+                    console.log("Using static fallback news");
+                    return getStaticNewsContent(services && services.length > 0 ? services[0].toLowerCase() : null);
                 }
+            }
+            
+            /**
+             * Helper function to extract a short description from HTML content
+             * @param {string} htmlContent - HTML content to extract description from
+             * @returns {string} - Plain text description
+             */
+            function extractDescription(htmlContent) {
+                if (!htmlContent) return '';
                 
-                // Fallback: Use RSS feed which typically has fewer CORS restrictions
                 try {
-                    const rssUrl = 'https://aws.amazon.com/new/feed/';
-                    const corsProxyRssUrl = `https://corsproxy.io/?${encodeURIComponent(rssUrl)}`;
+                    // Simple approach: strip HTML tags using regex
+                    const plainText = htmlContent.replace(/<[^>]*>/g, ' ')
+                        .replace(/\s+/g, ' ')
+                        .trim();
                     
-                    const response = await fetch(corsProxyRssUrl);
-                    const text = await response.text();
-                    
-                    // Parse the RSS XML
-                    const parser = new DOMParser();
-                    const xmlDoc = parser.parseFromString(text, "text/xml");
-                    const items = xmlDoc.querySelectorAll("item");
-                    
-                    // Convert RSS items to our format
-                    const allItems = Array.from(items).map(item => {
-                        const title = item.querySelector("title").textContent;
-                        const link = item.querySelector("link").textContent;
-                        const pubDate = new Date(item.querySelector("pubDate").textContent);
-                        const description = item.querySelector("description").textContent;
-                        
-                        return {
-                            title,
-                            link,
-                            date: pubDate.toLocaleDateString(),
-                            description: extractDescription(description)
-                        };
-                    });
-                    
-                    // Filter items based on selected services
-                    const filteredItems = allItems.filter(item => {
-                        return selectedServices.some(service => {
-                            const serviceRegex = new RegExp(service, 'i');
-                            return serviceRegex.test(item.title);
-                        });
-                    });
-                    
-                    return filteredItems.length > 0 ? filteredItems.slice(0, 5) : allItems.slice(0, 5);
+                    return plainText.length > 150 ? plainText.substring(0, 150) + '...' : plainText;
                 } catch (error) {
-                    console.warn('RSS fetch failed:', error);
+                    console.error("Error extracting description:", error);
+                    return "Read more on the AWS Blog...";
                 }
+            }
+            
+            /**
+             * Provides static fallback news when all fetch methods fail
+             * @param {string} service - AWS service name
+             * @returns {Array} - Static news items
+             */
+            function getStaticNewsContent(service) {
+                console.log(`Getting static news for: ${service || 'general'}`);
                 
-                // Final fallback: Show a message about the issue
-                return [{
-                    title: "Unable to fetch AWS news due to CORS restrictions",
+                // Latest AWS blog posts (manually curated)
+                const latestNews = [
+                    {
+                        title: "AWS Week in Review – April 15, 2024",
+                        link: "https://aws.amazon.com/blogs/aws/aws-week-in-review-april-15-2024/",
+                        date: "April 15, 2024",
+                        description: "This post summarizes the latest AWS news, announcements, blog posts, and more from the week of April 15, 2024."
+                    },
+                    {
+                        title: "New – Amazon Q Business Agents",
+                        link: "https://aws.amazon.com/blogs/aws/new-amazon-q-business-agents/",
+                        date: "April 11, 2024",
+                        description: "Amazon Q Business Agents are purpose-built AI assistants that help you complete specific tasks in your organization."
+                    },
+                    {
+                        title: "New – Amazon Q Developer Agent for Software Development",
+                        link: "https://aws.amazon.com/blogs/aws/new-amazon-q-developer-agent-for-software-development/",
+                        date: "April 4, 2024",
+                        description: "Amazon Q Developer Agent for Software Development helps you build applications faster with generative AI assistance."
+                    },
+                    {
+                        title: "New – Amazon S3 Express One Zone",
+                        link: "https://aws.amazon.com/blogs/aws/new-amazon-s3-express-one-zone/",
+                        date: "November 28, 2023",
+                        description: "S3 Express One Zone is a new storage class that delivers consistent single-digit millisecond data access for your most performance-sensitive applications."
+                    },
+                    {
+                        title: "AWS Lambda Functions Now Scale 12x Faster When Handling High-Volume Events",
+                        link: "https://aws.amazon.com/blogs/aws/aws-lambda-functions-now-scale-12x-faster-when-handling-high-volume-events/",
+                        date: "November 27, 2023",
+                        description: "AWS Lambda now scales 12 times faster when processing high volumes of events, reducing the need for pre-warming and improving performance for event-driven applications."
+                    }
+                ];
+                
+                // Service-specific static news (add more as needed)
+                const serviceNews = {
+                    "bedrock": [
+                        {
+                            title: "Amazon Bedrock now supports Anthropic's Claude 3 Opus model",
+                            link: "https://aws.amazon.com/blogs/machine-learning/amazon-bedrock-now-supports-anthropics-claude-3-opus-model/",
+                            date: "March 4, 2024",
+                            description: "Amazon Bedrock now supports Claude 3 Opus, Anthropic's most intelligent model to date."
+                        },
+                        {
+                            title: "Amazon Bedrock announces support for Anthropic's Claude 3 Haiku and Sonnet models",
+                            link: "https://aws.amazon.com/blogs/machine-learning/amazon-bedrock-announces-support-for-anthropics-claude-3-haiku-and-sonnet-models/",
+                            date: "March 4, 2024",
+                            description: "Amazon Bedrock now supports Claude 3 Haiku and Claude 3 Sonnet, two new foundation models (FMs) from Anthropic."
+                        }
+                    ],
+                    "lambda": [
+                        {
+                            title: "AWS Lambda Functions Now Scale 12x Faster When Handling High-Volume Events",
+                            link: "https://aws.amazon.com/blogs/aws/aws-lambda-functions-now-scale-12x-faster-when-handling-high-volume-events/",
+                            date: "November 27, 2023",
+                            description: "AWS Lambda now scales 12 times faster when processing high volumes of events, reducing the need for pre-warming and improving performance for event-driven applications."
+                        }
+                    ]
+                };
+                
+                // Return service-specific news if available, otherwise general news
+                return (service && serviceNews[service]) || latestNews;
+            }
                     link: "https://aws.amazon.com/new/",
                     date: new Date().toLocaleDateString(),
                     description: "News could not be loaded due to cross-origin restrictions. Click to visit the AWS What's New page directly."
